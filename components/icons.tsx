@@ -1,9 +1,9 @@
 import React from 'react';
 
 export const Logo = () => (
-    <svg width="150" height="40" viewBox="0 0 150 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <text x="5" y="30" fontFamily="system-ui, sans-serif" fontSize="30" fontWeight="bold" fill="url(#logo-gradient)">
-            Visora
+    <svg width="180" height="40" viewBox="0 0 180 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="5" y="30" fontFamily="system-ui, sans-serif" fontSize="28" fontWeight="bold" fill="url(#logo-gradient)">
+            StudyAI86
         </text>
         <defs>
             <linearGradient id="logo-gradient" x1="0" y1="0" x2="100" y2="40">
