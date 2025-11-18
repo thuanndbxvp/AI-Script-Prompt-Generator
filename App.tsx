@@ -2,7 +2,7 @@
 import React, { useState, useCallback, ChangeEvent, useMemo, useEffect } from 'react';
 import { AppState, FrameRatio, CharacterType, HumanCharacter, AnimalCharacter, Character, GeneratedContent, GeneratedPrompt, ApiKeyConfig, GeminiModelConfig, GeminiModelId } from './types';
 import { FRAME_RATIO_OPTIONS, HUMAN_OPTIONS, ANIMAL_OPTIONS, PRESET_CHARACTERS, IMAGE_STYLES } from './constants';
-import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon } from './components/icons';
+import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon } from './components/icons';
 import { generateScriptAndPrompts, calculateDurationFromScript, suggestCharacterFromScript, cleanScript, validateApiKey } from './services/geminiService';
 
 // --- Constants & Config ---
@@ -153,10 +153,12 @@ const CharacterForm: React.FC<CharacterFormProps> = ({ character, updateCharacte
 const PromptItem: React.FC<{ prompt: GeneratedPrompt, type: 'Ảnh' | 'Video' }> = ({ prompt, type }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedText, setEditedText] = useState(prompt.text);
+    const [isCopied, setIsCopied] = useState(false);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(prompt.text);
-        alert('Đã sao chép prompt!');
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
     };
     
     return (
@@ -171,7 +173,13 @@ const PromptItem: React.FC<{ prompt: GeneratedPrompt, type: 'Ảnh' | 'Video' }>
                 </div>
                 <div className="flex items-center gap-2 text-gray-400">
                     <button onClick={() => setIsEditing(!isEditing)} className="hover:text-brand-primary p-1"><EditIcon /></button>
-                    <button onClick={handleCopy} className="hover:text-brand-primary p-1"><CopyIcon /></button>
+                    <button 
+                        onClick={handleCopy} 
+                        className={`p-1 transition-all duration-200 ${isCopied ? 'text-green-500 scale-110' : 'hover:text-brand-primary'}`}
+                        title={isCopied ? "Đã sao chép" : "Sao chép"}
+                    >
+                        {isCopied ? <CheckIcon /> : <CopyIcon />}
+                    </button>
                 </div>
             </div>
             <p className="mt-2 text-sm text-neutral-text-secondary italic border-l-2 border-gray-200 pl-3">{prompt.description}</p>
