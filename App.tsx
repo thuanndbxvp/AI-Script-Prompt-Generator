@@ -2,7 +2,7 @@
 import React, { useState, useCallback, ChangeEvent, useMemo, useEffect } from 'react';
 import { AppState, FrameRatio, CharacterType, HumanCharacter, AnimalCharacter, Character, GeneratedContent, GeneratedPrompt, ApiKeyConfig, GeminiModelConfig, GeminiModelId } from './types';
 import { FRAME_RATIO_OPTIONS, HUMAN_OPTIONS, ANIMAL_OPTIONS, PRESET_CHARACTERS, IMAGE_STYLES } from './constants';
-import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon, Logo } from './components/icons';
+import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon, Logo, XMarkIcon, ExclamationCircleIcon, InformationCircleIcon } from './components/icons';
 import { generateScriptAndPrompts, calculateDurationFromScript, suggestCharacterFromScript, cleanScript, validateApiKey } from './services/geminiService';
 
 // --- Constants & Config ---
@@ -13,6 +13,42 @@ const GEMINI_MODELS: GeminiModelConfig[] = [
     { id: GeminiModelId.PRO, name: 'Gemini 2.5 Pro', description: 'Thông minh hơn, lý tưởng cho kịch bản phức tạp.' },
     { id: GeminiModelId.PRO_3, name: 'Gemini 3.0 Pro Preview', description: 'Mô hình lý luận cao cấp nhất (Experimental).' },
 ];
+
+// --- Toast Component ---
+
+interface Toast {
+  id: number;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+const ToastContainer: React.FC<{ toasts: Toast[], removeToast: (id: number) => void }> = ({ toasts, removeToast }) => {
+  return (
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-3">
+      {toasts.map(toast => (
+        <div 
+          key={toast.id} 
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border transition-all duration-300 animate-fade-in-down min-w-[300px] max-w-md bg-white ${
+            toast.type === 'success' ? 'border-l-4 border-l-green-500' :
+            toast.type === 'error' ? 'border-l-4 border-l-red-500' :
+            'border-l-4 border-l-blue-500'
+          }`}
+        >
+          <div className="flex-shrink-0">
+            {toast.type === 'success' && <CheckIcon className="text-green-500" />}
+            {toast.type === 'error' && <ExclamationCircleIcon className="text-red-500" />}
+            {toast.type === 'info' && <InformationCircleIcon className="text-blue-500" />}
+          </div>
+          <p className="text-sm font-medium text-gray-800 flex-grow">{toast.message}</p>
+          <button onClick={() => removeToast(toast.id)} className="text-gray-400 hover:text-gray-600">
+            <XMarkIcon />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 
 // --- Helper Components defined outside App to prevent re-renders ---
 
@@ -324,10 +360,11 @@ interface ApiManagerModalProps {
     onToggleKey: (key: string) => void;
     activeModelId: GeminiModelId;
     onChangeModel: (id: GeminiModelId) => void;
+    addToast: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 const ApiManagerModal: React.FC<ApiManagerModalProps> = ({ 
-    isOpen, onClose, apiKeys, onAddKey, onDeleteKey, onToggleKey, activeModelId, onChangeModel 
+    isOpen, onClose, apiKeys, onAddKey, onDeleteKey, onToggleKey, activeModelId, onChangeModel, addToast
 }) => {
     const [newKey, setNewKey] = useState('');
     const [newLabel, setNewLabel] = useState('');
@@ -344,8 +381,10 @@ const ApiManagerModal: React.FC<ApiManagerModalProps> = ({
             await onAddKey(newKey.trim(), newLabel.trim() || `API Key ${apiKeys.length + 1}`);
             setNewKey('');
             setNewLabel('');
+            addToast("Thêm API Key thành công!", 'success');
         } catch (err) {
             setErrorMsg('API Key không hợp lệ hoặc không thể kết nối.');
+            addToast("API Key không hợp lệ!", 'error');
         } finally {
             setIsVerifying(false);
         }
@@ -474,6 +513,9 @@ const App: React.FC = () => {
   const [isCalculatingDuration, setIsCalculatingDuration] = useState(false);
   const [isSuggestingCharacterId, setIsSuggestingCharacterId] = useState<string | null>(null);
 
+  // Toast State
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
   // API & Model State
   const [isApiModalOpen, setIsApiModalOpen] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKeyConfig[]>([]);
@@ -503,6 +545,20 @@ const App: React.FC = () => {
       return apiKeys.find(k => k.isActive)?.key || '';
   };
 
+  // --- Toast Handlers ---
+
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  }, []);
+
+  const removeToast = useCallback((id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   // --- API Management Handlers ---
 
   const handleAddKey = async (key: string, label: string) => {
@@ -530,6 +586,7 @@ const App: React.FC = () => {
           updatedKeys[updatedKeys.length - 1].isActive = true;
       }
       saveApiKeys(updatedKeys);
+      addToast("Đã xóa API Key.", 'info');
   };
 
   const handleToggleKey = (keyToActivate: string) => {
@@ -538,11 +595,13 @@ const App: React.FC = () => {
           isActive: k.key === keyToActivate
       }));
       saveApiKeys(updatedKeys);
+      addToast("Đã chuyển đổi API Key hoạt động.", 'success');
   };
 
   const handleChangeModel = (id: GeminiModelId) => {
       setActiveModelId(id);
       localStorage.setItem('visora_active_model', id);
+      addToast(`Đã đổi model sang: ${GEMINI_MODELS.find(m => m.id === id)?.name}`, 'info');
   };
 
   // --- Core App Logic ---
@@ -558,12 +617,12 @@ const App: React.FC = () => {
 
   const handleStart = () => {
     if (topic.trim() === '' && userScript.trim() === '') {
-      alert("Vui lòng nhập chủ đề / tên dự án hoặc dán kịch bản của bạn.");
+      addToast("Vui lòng nhập chủ đề hoặc dán kịch bản của bạn.", "error");
       return;
     }
     if (!getActiveKey()) {
         setIsApiModalOpen(true);
-        alert("Vui lòng thêm và kích hoạt một API Key trước khi bắt đầu.");
+        addToast("Vui lòng thêm và kích hoạt một API Key trước khi bắt đầu.", "info");
         return;
     }
     setAppState(AppState.INPUT_FORM);
@@ -585,7 +644,8 @@ const App: React.FC = () => {
           gender: 'Nam', age: '18–25', height: '170cm', skinColor: 'Sáng', hairStyle: 'Ngắn', hairColor: 'Đen', outfit: 'Casual', face: 'Tự nhiên', expression: 'Tự nhiên', style: 'Hiện đại'
         };
     setCharacters(prev => [...prev, newCharacter as Character]);
-  }, []);
+    if (!preset) addToast("Đã thêm nhân vật mới", "info");
+  }, [addToast]);
 
   const updateCharacter = useCallback((id: string, newDetails: Partial<Character>) => {
     setCharacters(prev => prev.map(char => {
@@ -604,12 +664,13 @@ const App: React.FC = () => {
 
   const removeCharacter = useCallback((id: string) => {
     setCharacters(prev => prev.filter(char => char.id !== id));
-  }, []);
+    addToast("Đã xóa nhân vật", "info");
+  }, [addToast]);
   
   const handleGenerate = async () => {
     const activeKey = getActiveKey();
     if (!activeKey) {
-        alert("Không tìm thấy API Key hợp lệ. Vui lòng kiểm tra lại cài đặt API.");
+        addToast("Không tìm thấy API Key hợp lệ.", "error");
         setIsApiModalOpen(true);
         return;
     }
@@ -637,10 +698,12 @@ const App: React.FC = () => {
         );
         setGeneratedContent(result);
         setAppState(AppState.RESULTS);
+        addToast("Tạo nội dung thành công!", "success");
     } catch (e) {
         const err = e as Error;
         setError(err.message || 'Đã xảy ra lỗi không xác định.');
         setAppState(AppState.ERROR);
+        addToast("Đã xảy ra lỗi khi tạo nội dung.", "error");
     }
   };
 
@@ -648,7 +711,7 @@ const App: React.FC = () => {
     if (!userScript.trim()) return;
     const activeKey = getActiveKey();
     if (!activeKey) {
-        alert("Cần API Key để tính toán.");
+        addToast("Cần API Key để tính toán.", "error");
         setIsApiModalOpen(true);
         return;
     }
@@ -658,8 +721,9 @@ const App: React.FC = () => {
         const estimatedSeconds = await calculateDurationFromScript(activeKey, userScript, activeModelId);
         setMinutes(Math.floor(estimatedSeconds / 60));
         setSeconds(estimatedSeconds % 60);
+        addToast(`Ước tính thời lượng: ${estimatedSeconds}s`, "success");
     } catch (err) {
-        alert((err as Error).message);
+        addToast((err as Error).message, "error");
     } finally {
         setIsCalculatingDuration(false);
     }
@@ -669,7 +733,7 @@ const App: React.FC = () => {
     if (!userScript.trim()) return;
     const activeKey = getActiveKey();
     if (!activeKey) {
-        alert("Cần API Key để gợi ý.");
+        addToast("Cần API Key để gợi ý.", "error");
         setIsApiModalOpen(true);
         return;
     }
@@ -681,8 +745,9 @@ const App: React.FC = () => {
     try {
         const suggestion = await suggestCharacterFromScript(activeKey, userScript, characterToUpdate, activeModelId);
         updateCharacter(characterId, suggestion);
+        addToast("Đã cập nhật nhân vật từ kịch bản!", "success");
     } catch (err) {
-        alert((err as Error).message);
+        addToast((err as Error).message, "error");
     } finally {
         setIsSuggestingCharacterId(null);
     }
@@ -721,6 +786,7 @@ const App: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    addToast("Đã tải xuống file CSV!", "success");
 };
 
 
@@ -1002,7 +1068,9 @@ const App: React.FC = () => {
         onToggleKey={handleToggleKey}
         activeModelId={activeModelId}
         onChangeModel={handleChangeModel}
+        addToast={addToast}
       />
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </main>
   );
 };

@@ -7,6 +7,22 @@ const getAIClient = (apiKey: string) => {
     return new GoogleGenAI({ apiKey: apiKey });
 };
 
+// Helper to clean JSON string from Markdown code blocks
+const cleanJsonString = (jsonString: string): string => {
+    let clean = jsonString.trim();
+    // Remove ```json ... ``` or ``` ... ```
+    if (clean.startsWith('```')) {
+        clean = clean.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+    }
+    // Find the first '{' and last '}' to ensure valid object bounds
+    const firstBrace = clean.indexOf('{');
+    const lastBrace = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+        clean = clean.substring(firstBrace, lastBrace + 1);
+    }
+    return clean;
+};
+
 export const validateApiKey = async (apiKey: string): Promise<boolean> => {
     try {
         const ai = getAIClient(apiKey);
@@ -142,7 +158,7 @@ export const generateScriptAndPrompts = async (
       },
     });
 
-    const jsonString = response.text.trim();
+    const jsonString = cleanJsonString(response.text);
     const parsedJson = JSON.parse(jsonString);
 
     return {
@@ -186,7 +202,9 @@ export const calculateDurationFromScript = async (apiKey: string, script: string
         },
       },
     });
-    const result = JSON.parse(response.text);
+    
+    const jsonString = cleanJsonString(response.text);
+    const result = JSON.parse(jsonString);
     return result.totalSeconds || 0;
   } catch (error) {
     console.error("Error calculating duration:", error);
@@ -247,7 +265,8 @@ export const suggestCharacterFromScript = async (
                 responseSchema: characterType === CharacterType.HUMAN ? humanCharacterSchema : animalCharacterSchema,
             },
         });
-        return JSON.parse(response.text);
+        const jsonString = cleanJsonString(response.text);
+        return JSON.parse(jsonString);
     } catch (error) {
         console.error("Error suggesting character:", error);
         throw new Error("Failed to suggest character from script.");
