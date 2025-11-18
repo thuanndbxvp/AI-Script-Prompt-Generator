@@ -1,0 +1,5 @@
+{
+  "name": "AI Script & Prompt Generator Ver2",
+  "description": "An application to automatically generate scripts, image prompts, and video prompts from a user-provided topic, with features for character consistency, duration calculation, and frame ratio selection.",
+  "requestFramePermissions": []
+}
