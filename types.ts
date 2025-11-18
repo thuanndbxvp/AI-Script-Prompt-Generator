@@ -69,6 +69,7 @@ export interface Character {
   role: string; // Anh hùng | Phản anh hùng | Phản diện | Comic relief | NPC
   gender: string;
   ageRange: string;
+  group?: string; // Group categorization
   
   visual: CharacterVisual;
   personality: CharacterPersonality;
