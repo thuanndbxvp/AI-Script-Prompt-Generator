@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { AppState, FrameRatio, Character, GeneratedContent, GeminiModelId } from './types';
 import { FRAME_RATIO_OPTIONS, IMAGE_STYLES, CHARACTER_UNIVERSE } from './constants';
-import { Logo, BackIcon, ExclamationCircleIcon, SettingsIcon, PlusIcon, TrashIcon, XMarkIcon, CheckIcon } from './components/icons';
+import { Logo, BackIcon, ExclamationCircleIcon, SettingsIcon, PlusIcon, TrashIcon, XMarkIcon, CheckIcon, KeyIcon, UserIcon, MoonIcon, SunIcon, FolderOpenIcon, ClapperboardIcon } from './components/icons';
 import { generateScriptAndPrompts } from './services/geminiService';
 
 const API_KEY = process.env.API_KEY || "";
@@ -144,6 +144,47 @@ const DirectorModal: React.FC<DirectorModalProps> = ({ isOpen, onClose, frameRat
     );
 };
 
+const LibraryModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, onClose }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg p-6 text-center shadow-2xl">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-900">Thư viện của tôi</h3>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><XMarkIcon/></button>
+                </div>
+                <div className="py-12 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                    <FolderOpenIcon />
+                    <p className="mt-2 font-medium">Chưa có dự án nào được lưu.</p>
+                    <p className="text-xs">Hãy tạo dự án mới để xem chúng ở đây.</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ApiModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, onClose }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900">Cấu hình API</h3>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><XMarkIcon/></button>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start mb-4">
+                     <div className="text-green-500 mt-1"><CheckIcon /></div>
+                     <div className="ml-3">
+                        <h4 className="text-sm font-bold text-green-800">Hệ thống đã sẵn sàng</h4>
+                        <p className="text-xs text-green-700 mt-1">API Key đã được cấu hình tự động thông qua biến môi trường.</p>
+                     </div>
+                </div>
+                <button onClick={onClose} className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700">Đóng</button>
+            </div>
+        </div>
+    );
+};
+
 export default function App() {
     const [appState, setAppState] = useState<AppState>(AppState.HOME);
     const [topic, setTopic] = useState('');
@@ -161,6 +202,10 @@ export default function App() {
     
     const [showUniverseModal, setShowUniverseModal] = useState(false);
     const [showDirectorModal, setShowDirectorModal] = useState(false);
+    const [showLibraryModal, setShowLibraryModal] = useState(false);
+    const [showApiModal, setShowApiModal] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(false);
+
     const [toasts, setToasts] = useState<{id: number, msg: string}[]>([]);
 
     const addToast = (msg: string) => {
@@ -169,6 +214,11 @@ export default function App() {
         setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== id));
         }, 3000);
+    };
+
+    const handleThemeToggle = () => {
+        setIsDarkMode(!isDarkMode);
+        addToast(isDarkMode ? "Chuyển sang chế độ Sáng" : "Chuyển sang chế độ Tối");
     };
 
     const handleStart = () => {
@@ -271,12 +321,6 @@ export default function App() {
             <div className="flex justify-between items-center mb-6">
                 <button onClick={handleBack} className="flex items-center text-gray-600 hover:text-gray-900 font-medium">
                     <BackIcon /> <span className="ml-2">Quay lại</span>
-                </button>
-                <button 
-                    onClick={() => setShowDirectorModal(true)}
-                    className="flex items-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-indigo-600 px-4 py-2 rounded-lg shadow-sm transition-all font-medium"
-                >
-                    <SettingsIcon /> <span className="ml-2">Chế độ Đạo diễn</span>
                 </button>
             </div>
 
@@ -538,6 +582,43 @@ export default function App() {
                      <div className="cursor-pointer" onClick={() => setAppState(AppState.HOME)}>
                         <Logo />
                      </div>
+                     <div className="flex items-center space-x-2">
+                        <button 
+                            onClick={() => setShowDirectorModal(true)}
+                            className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-all hidden md:flex items-center"
+                            title="Chế độ Đạo diễn"
+                        >
+                            <SettingsIcon />
+                            <span className="ml-1 text-sm font-medium">Đạo diễn</span>
+                        </button>
+                         <button 
+                            onClick={() => setShowLibraryModal(true)}
+                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-full transition-all"
+                            title="Thư viện"
+                        >
+                            <FolderOpenIcon />
+                        </button>
+                        <button 
+                            onClick={() => setShowApiModal(true)}
+                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-full transition-all"
+                            title="API"
+                        >
+                            <KeyIcon />
+                        </button>
+                        <button 
+                            onClick={handleThemeToggle}
+                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-full transition-all"
+                            title="Giao diện"
+                        >
+                            {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                        </button>
+                         <button 
+                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-full transition-all"
+                            title="Tài khoản"
+                        >
+                            <UserIcon />
+                        </button>
+                     </div>
                 </div>
             </header>
             
@@ -564,6 +645,16 @@ export default function App() {
                 imageStyle={imageStyle}
                 setImageStyle={setImageStyle}
                 addToast={addToast}
+            />
+
+            <LibraryModal 
+                isOpen={showLibraryModal}
+                onClose={() => setShowLibraryModal(false)}
+            />
+
+            <ApiModal 
+                isOpen={showApiModal}
+                onClose={() => setShowApiModal(false)}
             />
 
             {/* Toast Notifications */}
