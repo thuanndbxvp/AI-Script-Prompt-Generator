@@ -1,8 +1,8 @@
 
 import React, { useState, useCallback, ChangeEvent, useMemo, useEffect } from 'react';
 import { AppState, FrameRatio, Character, GeneratedContent, GeneratedPrompt, ApiKeyConfig, GeminiModelConfig, GeminiModelId, CharacterVisual, CharacterPersonality, CharacterBehavior, CharacterVoice, CharacterAiPrompt, CharacterProductionNotes } from './types';
-import { FRAME_RATIO_OPTIONS, CHARACTER_TYPES, CHARACTER_ROLES, BODY_TYPES, PRESET_CHARACTERS, IMAGE_STYLES } from './constants';
-import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon, Logo, XMarkIcon, ExclamationCircleIcon, InformationCircleIcon } from './components/icons';
+import { FRAME_RATIO_OPTIONS, CHARACTER_TYPES, CHARACTER_ROLES, BODY_TYPES, CHARACTER_UNIVERSE, IMAGE_STYLES } from './constants';
+import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon, Logo, XMarkIcon, ExclamationCircleIcon, InformationCircleIcon, ClapperboardIcon } from './components/icons';
 import { generateScriptAndPrompts, calculateDurationFromScript, suggestCharacterFromScript, cleanScript, validateApiKey } from './services/geminiService';
 
 // --- Constants & Config ---
@@ -430,6 +430,19 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ content, onBack, onDownlo
                     <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
                         <h2 className="text-xl font-bold mb-4 text-neutral-text">Nội dung kịch bản</h2>
                         <p className="whitespace-pre-wrap leading-relaxed text-lg text-gray-700">{content.script}</p>
+                        
+                        {content.characters && content.characters.length > 0 && (
+                            <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                                <h3 className="font-bold text-blue-800 mb-2">Nhân vật được sử dụng:</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {content.characters.map(c => (
+                                        <span key={c.id} className="px-3 py-1 bg-white text-blue-600 rounded-full text-sm font-medium shadow-sm border border-blue-100">
+                                            {c.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
                 {activeTab === 'image' && (
@@ -452,10 +465,11 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ content, onBack, onDownlo
 interface HeaderProps {
     onGoHome: () => void;
     onOpenApi: () => void;
+    onOpenDirector: () => void;
     apiKeyCount: number;
 }
 
-const Header: React.FC<HeaderProps> = ({ onGoHome, onOpenApi, apiKeyCount }) => {
+const Header: React.FC<HeaderProps> = ({ onGoHome, onOpenApi, onOpenDirector, apiKeyCount }) => {
     return (
         <header className="sticky top-0 z-50 w-full bg-neutral-dark/90 backdrop-blur-md border-b border-gray-200">
             <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -475,6 +489,15 @@ const Header: React.FC<HeaderProps> = ({ onGoHome, onOpenApi, apiKeyCount }) => 
                         title="Edit / Theme"
                     >
                         <EditIcon />
+                    </button>
+
+                    {/* Director Button */}
+                    <button
+                        onClick={onOpenDirector}
+                        className="hidden md:flex items-center gap-2 h-9 px-4 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-lg shadow-sm transition-all"
+                    >
+                        <ClapperboardIcon />
+                        <span>Đạo diễn</span>
                     </button>
 
                     {/* Login Button */}
@@ -511,6 +534,205 @@ const Header: React.FC<HeaderProps> = ({ onGoHome, onOpenApi, apiKeyCount }) => 
         </header>
     );
 }
+
+// --- Director Mode Modal ---
+
+interface DirectorModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    frameRatio: FrameRatio;
+    setFrameRatio: (ratio: FrameRatio) => void;
+    imageStyle: string;
+    setImageStyle: (style: string) => void;
+    addToast: (message: string, type: 'success' | 'error' | 'info') => void;
+}
+
+const DirectorModal: React.FC<DirectorModalProps> = ({ isOpen, onClose, frameRatio, setFrameRatio, imageStyle, setImageStyle, addToast }) => {
+    const [activeTab, setActiveTab] = useState<'ratio' | 'style'>('ratio');
+
+    if (!isOpen) return null;
+
+    const groupedImageStyles = IMAGE_STYLES.reduce((acc, style) => {
+        acc[style.group] = [...(acc[style.group] || []), style];
+        return acc;
+    }, {} as Record<string, typeof IMAGE_STYLES>);
+
+    const handleConfirm = () => {
+        const ratioLabel = FRAME_RATIO_OPTIONS.find(opt => opt.value === frameRatio)?.label || frameRatio;
+        const styleObj = IMAGE_STYLES.find(s => s.prompt === imageStyle);
+        const styleName = styleObj ? styleObj.name : "Tùy chỉnh";
+
+        addToast(`Đã chọn: Khung hình ${ratioLabel} - Phong cách ${styleName}`, 'success');
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-gray-100 p-2 rounded-lg">
+                             <ClapperboardIcon />
+                        </div>
+                        <div>
+                             <h2 className="text-xl font-bold text-neutral-text">Cài đặt Đạo diễn</h2>
+                             <p className="text-sm text-gray-500">Thiết lập thông số kỹ thuật cho dự án.</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                        <XMarkIcon />
+                    </button>
+                </div>
+
+                <div className="flex border-b border-gray-100">
+                    <button 
+                        onClick={() => setActiveTab('ratio')}
+                        className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'ratio' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Khung hình (Ratio)
+                    </button>
+                    <button 
+                         onClick={() => setActiveTab('style')}
+                         className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'style' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Phong cách (Style)
+                    </button>
+                </div>
+                
+                <div className="p-6 bg-gray-50 min-h-[300px]">
+                    {activeTab === 'ratio' && (
+                         <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                            {FRAME_RATIO_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setFrameRatio(opt.value)}
+                                    className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center space-y-2 ${frameRatio === opt.value ? 'bg-white border-brand-primary text-brand-primary shadow-md' : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-200 hover:bg-gray-50'}`}
+                                >
+                                    {opt.value === '16:9' && <Frame169Icon />}
+                                    {opt.value === '9:16' && <Frame916Icon />}
+                                    {opt.value === '1:1' && <Frame11Icon />}
+                                    {opt.value === '4:5' && <Frame45Icon />}
+                                    <span className="font-bold">{opt.label}</span>
+                                    <span className="text-xs text-center opacity-80">{opt.description.split('–')[0]}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {activeTab === 'style' && (
+                         <div className="animate-fade-in">
+                            <label className="block text-sm font-bold text-gray-700 mb-3">Chọn phong cách hình ảnh/video:</label>
+                            <select
+                                value={imageStyle}
+                                onChange={(e) => setImageStyle(e.target.value)}
+                                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-neutral-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent shadow-sm"
+                                size={10} // Show as list
+                            >
+                                {Object.entries(groupedImageStyles).map(([group, styles]) => (
+                                    <optgroup label={group} key={group} className="font-semibold text-gray-700 bg-gray-50 py-2">
+                                        {(styles as typeof IMAGE_STYLES).map(style => (
+                                            <option key={style.name} value={style.prompt} className="text-gray-900 py-2 pl-4">
+                                                {style.name}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                            </select>
+                            <p className="mt-4 text-xs text-gray-500 bg-white p-3 rounded-lg border border-gray-200 italic">
+                                Prompt mẫu: "{imageStyle}"
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-gray-100 bg-white rounded-b-2xl text-right">
+                    <button onClick={handleConfirm} className="bg-brand-primary hover:bg-brand-secondary text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-sm">
+                        Xác nhận
+                    </button>
+                 </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Character Universe Modal ---
+
+interface UniverseModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSelect: (character: Character) => void;
+}
+
+const CharacterUniverseModal: React.FC<UniverseModalProps> = ({ isOpen, onClose, onSelect }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    if (!isOpen) return null;
+
+    const filteredCharacters = CHARACTER_UNIVERSE.filter(c => 
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        c.role.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <div>
+                         <h2 className="text-xl font-bold text-neutral-text">Vũ trụ Nhân vật</h2>
+                         <p className="text-sm text-gray-500">Chọn nhân vật để thêm vào dự án của bạn.</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                        <XMarkIcon />
+                    </button>
+                </div>
+
+                <div className="p-4 border-b border-gray-100 bg-gray-50">
+                    <input 
+                        type="text" 
+                        placeholder="Tìm kiếm theo tên hoặc vai trò..." 
+                        className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-primary outline-none"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredCharacters.map(char => (
+                            <div key={char.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all flex flex-col">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm">
+                                        {char.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-800 text-sm line-clamp-1">{char.name}</h3>
+                                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{char.role}</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs text-gray-500 mb-2 line-clamp-2 italic">"{char.personality.motivation}"</p>
+                                    <div className="flex flex-wrap gap-1">
+                                        {char.personality.coreTraits.slice(0, 2).map(trait => (
+                                            <span key={trait} className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">{trait}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => onSelect(char)}
+                                    className="mt-4 w-full py-2 bg-brand-light/10 text-brand-primary hover:bg-brand-primary hover:text-white text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
+                                >
+                                    <PlusIcon /> Chọn
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 // --- API Management Modal ---
 
@@ -684,6 +906,12 @@ const App: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<ApiKeyConfig[]>([]);
   const [activeModelId, setActiveModelId] = useState<GeminiModelId>(GeminiModelId.FLASH);
 
+  // Universe Modal State
+  const [isUniverseModalOpen, setIsUniverseModalOpen] = useState(false);
+
+  // Director Modal State
+  const [isDirectorModalOpen, setIsDirectorModalOpen] = useState(false);
+
   // Load API Config on Mount
   useEffect(() => {
       const storedKeys = localStorage.getItem('visora_api_keys');
@@ -771,12 +999,9 @@ const App: React.FC = () => {
 
   const totalSeconds = useMemo(() => (minutes * 60) + seconds, [minutes, seconds]);
 
-  const groupedImageStyles = useMemo(() => {
-    return IMAGE_STYLES.reduce((acc, style) => {
-        acc[style.group] = [...(acc[style.group] || []), style];
-        return acc;
-    }, {} as Record<string, typeof IMAGE_STYLES>);
-  }, []);
+  // Removed groupedImageStyles here because it is now in DirectorModal, 
+  // but if needed elsewhere it could be kept. 
+  // Leaving it out for now as it was only used in renderInputForm which is changing.
 
   const handleStart = () => {
     if (topic.trim() === '' && userScript.trim() === '') {
@@ -798,7 +1023,7 @@ const App: React.FC = () => {
   }
 
   const addNewCharacter = useCallback((preset: Partial<Character> | null = null) => {
-    const newId = `char_${Date.now()}`;
+    const newId = preset?.id ? `${preset.id}_${Date.now()}` : `char_${Date.now()}`;
     
     // Default empty structure based on the new complex schema
     const defaultCharacter: Character = {
@@ -849,12 +1074,20 @@ const App: React.FC = () => {
     };
 
     const newCharacter = preset 
-      ? { ...defaultCharacter, ...preset, id: newId } // Merge preset over default
+      ? { ...defaultCharacter, ...preset, id: preset.id || newId } // Use original ID if preset to keep link to universe
       : defaultCharacter;
+
+    // Check if character with same name already exists to avoid confusion
+    const exists = characters.some(c => c.name === newCharacter.name);
+    if (exists && preset) {
+         addToast("Nhân vật này đã có trong danh sách.", "info");
+         return;
+    }
 
     setCharacters(prev => [...prev, newCharacter]);
     if (!preset) addToast("Đã thêm nhân vật mới", "info");
-  }, [addToast]);
+    else addToast(`Đã thêm: ${newCharacter.name}`, "success");
+  }, [addToast, characters]);
 
   const updateCharacter = useCallback((id: string, newDetails: Partial<Character>) => {
     setCharacters(prev => prev.map(char => {
@@ -947,10 +1180,6 @@ const App: React.FC = () => {
     setIsSuggestingCharacterId(characterId);
     try {
         const suggestion = await suggestCharacterFromScript(activeKey, userScript, characterToUpdate, activeModelId);
-        // suggestion might be Partial<Character>, we merge deeply in logic or just spread here
-        // Since suggestion returns the full nested structure (if Gemini obeys), spread is mostly fine for top level, 
-        // but for deep nested objects, simple spread might overwrite if partial.
-        // However, geminiService is asked to return ALL fields.
         updateCharacter(characterId, suggestion);
         addToast("Đã cập nhật nhân vật từ kịch bản!", "success");
     } catch (err) {
@@ -1051,8 +1280,7 @@ const App: React.FC = () => {
         </div>
         
         <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left Column */}
+            <div className="grid grid-cols-1 gap-6">
                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
                     <div>
                         <h2 className="text-lg font-bold mb-4 text-neutral-text flex items-center gap-2">
@@ -1112,44 +1340,30 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* Right Column */}
-                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h2 className="text-lg font-bold mb-4 text-neutral-text flex items-center gap-2">
-                         <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">3</span>
-                         Khung hình (Frame Ratio)
-                    </h2>
-                    <div className="grid grid-cols-2 gap-4">
-                        {FRAME_RATIO_OPTIONS.map(opt => (
-                            <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => setFrameRatio(opt.value)}
-                                className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center space-y-2 ${frameRatio === opt.value ? 'bg-indigo-50 border-brand-primary text-brand-primary' : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-200 hover:bg-gray-50'}`}
-                            >
-                                {opt.value === '16:9' && <Frame169Icon />}
-                                {opt.value === '9:16' && <Frame916Icon />}
-                                {opt.value === '1:1' && <Frame11Icon />}
-                                {opt.value === '4:5' && <Frame45Icon />}
-                                <span className="font-bold">{opt.label}</span>
-                                <span className="text-xs text-center opacity-80">{opt.description.split('–')[0]}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
             </div>
 
             {/* Characters Section */}
             <div>
-                 <h2 className="text-lg font-bold mb-4 text-neutral-text flex items-center gap-2">
-                     <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">4</span>
-                     Chi tiết nhân vật
-                 </h2>
-                 
-                 <div className="flex flex-wrap gap-3 mb-6">
-                    <span className="text-sm font-medium text-gray-500 py-1">Gợi ý mẫu:</span>
-                    <button type="button" onClick={() => addNewCharacter(PRESET_CHARACTERS.stick_hero)} className="px-3 py-1 text-sm rounded-full bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium transition-colors">Anh hùng xui xẻo</button>
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold text-neutral-text flex items-center gap-2">
+                        <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">3</span>
+                        Chi tiết nhân vật
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={() => setIsUniverseModalOpen(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-brand-light to-brand-primary text-white text-sm font-bold rounded-full shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2"
+                    >
+                        <BookmarkIcon /> Chọn từ Vũ trụ Nhân vật
+                    </button>
                  </div>
+                 
+                 {characters.length === 0 && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-center mb-6">
+                        <p className="text-blue-800 font-medium mb-2">Chưa có nhân vật nào được chọn.</p>
+                        <p className="text-blue-600 text-sm">Nếu bạn để trống, AI sẽ tự động chọn nhân vật phù hợp từ Vũ trụ nhân vật cho kịch bản của bạn.</p>
+                    </div>
+                 )}
 
                  <div className="space-y-6">
                     {characters.map(char => (
@@ -1170,30 +1384,8 @@ const App: React.FC = () => {
                     onClick={() => addNewCharacter()}
                     className="mt-6 w-full md:w-auto py-3 px-6 flex items-center justify-center gap-2 text-brand-primary bg-indigo-50 hover:bg-indigo-100 rounded-xl font-bold transition-colors border border-indigo-100"
                  >
-                    <PlusIcon/> Thêm nhân vật mới
+                    <PlusIcon/> Thêm nhân vật thủ công (Custom)
                  </button>
-            </div>
-
-             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h2 className="text-lg font-bold mb-4 text-neutral-text flex items-center gap-2">
-                     <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">5</span>
-                     Phong cách ảnh/video
-                </h2>
-                <select
-                    value={imageStyle}
-                    onChange={(e) => setImageStyle(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-neutral-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                >
-                    {Object.entries(groupedImageStyles).map(([group, styles]) => (
-                        <optgroup label={group} key={group} className="font-semibold text-gray-700">
-                            {(styles as typeof IMAGE_STYLES).map(style => (
-                                <option key={style.name} value={style.prompt} className="text-gray-900">
-                                    {style.name}
-                                </option>
-                            ))}
-                        </optgroup>
-                    ))}
-                </select>
             </div>
             
             <div className="sticky bottom-0 py-6 bg-neutral-dark/90 backdrop-blur-sm flex justify-center z-10 border-t border-gray-200">
@@ -1259,6 +1451,7 @@ const App: React.FC = () => {
       <Header 
         onGoHome={() => setAppState(AppState.HOME)} 
         onOpenApi={() => setIsApiModalOpen(true)} 
+        onOpenDirector={() => setIsDirectorModalOpen(true)}
         apiKeyCount={apiKeys.length}
       />
       <div className="w-full flex-1 flex flex-col items-center">
@@ -1273,6 +1466,23 @@ const App: React.FC = () => {
         onToggleKey={handleToggleKey}
         activeModelId={activeModelId}
         onChangeModel={handleChangeModel}
+        addToast={addToast}
+      />
+      <CharacterUniverseModal 
+        isOpen={isUniverseModalOpen}
+        onClose={() => setIsUniverseModalOpen(false)}
+        onSelect={(char) => {
+            addNewCharacter(char);
+            setIsUniverseModalOpen(false);
+        }}
+      />
+      <DirectorModal 
+        isOpen={isDirectorModalOpen}
+        onClose={() => setIsDirectorModalOpen(false)}
+        frameRatio={frameRatio}
+        setFrameRatio={setFrameRatio}
+        imageStyle={imageStyle}
+        setImageStyle={setImageStyle}
         addToast={addToast}
       />
       <ToastContainer toasts={toasts} removeToast={removeToast} />

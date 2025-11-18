@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Character, FrameRatio, GeneratedContent, GeminiModelId } from '../types';
+import { CHARACTER_UNIVERSE } from '../constants';
 
 // Helper to initialize AI with a specific key
 const getAIClient = (apiKey: string) => {
@@ -45,6 +46,8 @@ const generateContentSchema = {
     duration: { type: Type.STRING },
     frameRatio: { type: Type.STRING },
     script: { type: Type.STRING },
+    // If AI auto-casts from Universe, we ask it to return the IDs of used characters here
+    usedCharacterIds: { type: Type.ARRAY, items: { type: Type.STRING } },
     imagePrompts: {
       type: Type.ARRAY,
       items: {
@@ -111,15 +114,41 @@ export const generateScriptAndPrompts = async (
   const visualStyleInstruction = imageStylePrompt ? `\n- **Visual Style Keywords:** ${imageStylePrompt}` : '';
   const visualStyleRuleAddition = imageStylePrompt ? ` At the very end of the generated prompt text, you MUST append the following style keywords exactly as they are: "${imageStylePrompt}"` : '';
 
-  // Format character info for the prompt to ensure the AI understands the specific new fields
-  const formattedCharacters = characters.map(c => {
-      return `
-      - Name: ${c.name} (${c.type}, ${c.role})
+  // LOGIC FOR CHARACTER UNIVERSE
+  let characterInstruction = '';
+  
+  if (characters.length > 0) {
+      // User selected specific characters
+      const formattedCharacters = characters.map(c => `
+      - Name: ${c.name} (ID: ${c.id}, ${c.type}, ${c.role})
         Visuals: ${JSON.stringify(c.visual)}
         Personality: ${JSON.stringify(c.personality)}
         AI Prompt Base: ${c.aiPrompt.positive}
+      `).join('\n');
+      
+      characterInstruction = `
+      - **Specific Casting:** You MUST use the following provided characters.
+      ${formattedCharacters}
       `;
-  }).join('\n');
+  } else {
+      // User did not select -> AI decides from Universe
+      // We send a summarized version of the universe to save some tokens but keep visuals
+      const universeSummary = CHARACTER_UNIVERSE.map(c => `
+      - ID: ${c.id} | Name: ${c.name} | Role: ${c.role}
+        Visuals: ${JSON.stringify(c.visual)}
+        AI Prompt Base: ${c.aiPrompt.positive}
+      `).join('\n');
+
+      characterInstruction = `
+      - **Auto-Casting Mode:** The user has not selected specific characters. 
+      - **Task:** You MUST choose the most appropriate characters from the "Character Universe" list below to cast in your script.
+      - **Constraint:** Do NOT invent new main characters. Use the provided ones.
+      - **Output:** In the JSON response, populate the 'usedCharacterIds' array with the IDs of the characters you chose.
+      
+      **Character Universe:**
+      ${universeSummary}
+      `;
+  }
 
   const prompt = `
     You are an expert scriptwriter and AI prompt engineer for visual content (specializing in animation/stick-figure/storytelling). 
@@ -131,9 +160,11 @@ export const generateScriptAndPrompts = async (
     ${durationAndPromptCountInstructions}
     - **Primary Frame Ratio:** ${frameRatio}${visualStyleInstruction}
     ${scriptInstruction}
-    - **Characters:**
-      ${formattedCharacters}
-    - **Character Consistency:** ${isConsistent ? 'All characters must be visually consistent throughout all prompts using the provided "Visuals" and "AI Prompt Base".' : 'Character appearance can vary slightly.'}
+    
+    **Character Instructions:**
+    ${characterInstruction}
+
+    **Character Consistency:** ${isConsistent ? 'All characters must be visually consistent throughout all prompts using the provided "Visuals" and "AI Prompt Base".' : 'Character appearance can vary slightly.'}
 
     **Rules:**
     1.  **Script:** ${userScript ? "Use the user-provided script and place it directly into the 'script' field of the JSON output." : "Generate a new script based on the topic and duration."}
@@ -144,7 +175,7 @@ export const generateScriptAndPrompts = async (
         -   The 'title' should be a short, descriptive name for the scene in Vietnamese.
         -   The 'description' should briefly explain the purpose of this specific prompt within the overall story in Vietnamese.
     3.  **Image Prompt Formula (Strict):** The 'text' for image prompts must be detailed, describing a static scene.
-        -   **CRITICAL:** If a character appears, you MUST use their "AI Prompt Base" (positive prompt) provided in the character list as the foundation, then add the specific action/pose for this scene.
+        -   **CRITICAL:** When a character appears, you MUST use their "AI Prompt Base" (positive prompt) provided in the character data as the foundation, then add the specific action/pose for this scene.
         -   Structure: [Character Visual Base] + [Specific Action/Pose] + [Setting/Background] + [Style Keywords].${visualStyleRuleAddition}
     4.  **Video Prompt Formula (Strict):** The 'text' for video prompts must focus on movement.
         -   **CRITICAL:** Use the "AI Prompt Base" for character consistency.
@@ -166,9 +197,16 @@ export const generateScriptAndPrompts = async (
     const jsonString = cleanJsonString(response.text);
     const parsedJson = JSON.parse(jsonString);
 
+    // If AI auto-casted, we need to resolve the used IDs back to full character objects
+    let finalCharacters = characters;
+    if (characters.length === 0 && parsedJson.usedCharacterIds && Array.isArray(parsedJson.usedCharacterIds)) {
+        const usedIds = parsedJson.usedCharacterIds;
+        finalCharacters = CHARACTER_UNIVERSE.filter(c => usedIds.includes(c.id));
+    }
+
     return {
         ...parsedJson,
-        characters: characters, // Add characters back in as they aren't in the response
+        characters: finalCharacters, 
     } as GeneratedContent;
 
   } catch (error) {
