@@ -2,7 +2,7 @@
 import React, { useState, useCallback, ChangeEvent, useMemo, useEffect } from 'react';
 import { AppState, FrameRatio, CharacterType, HumanCharacter, AnimalCharacter, Character, GeneratedContent, GeneratedPrompt, ApiKeyConfig, GeminiModelConfig, GeminiModelId } from './types';
 import { FRAME_RATIO_OPTIONS, HUMAN_OPTIONS, ANIMAL_OPTIONS, PRESET_CHARACTERS, IMAGE_STYLES } from './constants';
-import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon } from './components/icons';
+import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon, Logo } from './components/icons';
 import { generateScriptAndPrompts, calculateDurationFromScript, suggestCharacterFromScript, cleanScript, validateApiKey } from './services/geminiService';
 
 // --- Constants & Config ---
@@ -210,7 +210,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ content, onBack, onDownlo
 
     return (
         <div className="w-full max-w-7xl mx-auto px-4 py-8">
-            <div className="flex items-center mb-8 sticky top-0 bg-neutral-dark/90 backdrop-blur-md py-4 z-10">
+            <div className="flex items-center mb-8 sticky top-20 bg-neutral-dark/90 backdrop-blur-md py-4 z-10 transition-all">
                 <button onClick={onBack} className="p-2 rounded-full hover:bg-white hover:shadow-sm mr-4 transition-all text-gray-600"><BackIcon /></button>
                 <h1 className="text-2xl md:text-3xl font-bold text-neutral-text truncate">Kết quả: <span className="text-brand-primary">{content.projectName}</span></h1>
                 <button onClick={onDownload} className="ml-auto flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors">
@@ -247,6 +247,71 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ content, onBack, onDownlo
         </div>
     );
 };
+
+// --- Persistent Header Component ---
+
+interface HeaderProps {
+    onGoHome: () => void;
+    onOpenApi: () => void;
+    apiKeyCount: number;
+}
+
+const Header: React.FC<HeaderProps> = ({ onGoHome, onOpenApi, apiKeyCount }) => {
+    return (
+        <header className="sticky top-0 z-50 w-full bg-neutral-dark/90 backdrop-blur-md border-b border-gray-200">
+            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                {/* Logo Left */}
+                <div 
+                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                    onClick={onGoHome}
+                >
+                    <Logo />
+                </div>
+
+                {/* Actions Right */}
+                <div className="flex items-center gap-3">
+                     {/* Icon / Theme Button */}
+                    <button
+                        className="h-9 w-9 flex items-center justify-center bg-white hover:bg-gray-50 text-gray-500 rounded-lg border border-gray-200 shadow-sm transition-all"
+                        title="Edit / Theme"
+                    >
+                        <EditIcon />
+                    </button>
+
+                    {/* Login Button */}
+                    <button
+                        className="hidden md:flex items-center gap-2 h-9 px-4 bg-[#0F9D88] hover:bg-[#0d8a77] text-white text-sm font-medium rounded-lg shadow-sm transition-all"
+                    >
+                        <div className="bg-white p-0.5 rounded-full">
+                            <GoogleIcon />
+                        </div>
+                        <span>Đăng nhập</span>
+                    </button>
+
+                    {/* Library Button */}
+                    <button
+                        className="flex items-center gap-2 h-9 px-4 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg border border-gray-200 shadow-sm transition-all relative"
+                    >
+                         <BookmarkIcon />
+                         <span className="hidden sm:inline">Thư viện</span>
+                         <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[9px] font-bold text-white ring-2 ring-white">
+                            1
+                         </span>
+                    </button>
+
+                    {/* API Button */}
+                    <button
+                        onClick={onOpenApi}
+                        className="h-9 px-4 bg-[#22C55E] hover:bg-[#1ea951] text-white text-sm font-bold rounded-lg shadow-sm transition-all flex items-center gap-2"
+                    >
+                        API 
+                        <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-normal">{apiKeyCount > 0 ? 'Active' : '!'}</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+    );
+}
 
 // --- API Management Modal ---
 
@@ -287,7 +352,7 @@ const ApiManagerModal: React.FC<ApiManagerModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                     <h2 className="text-xl font-bold text-neutral-text">Cấu hình API & Model</h2>
@@ -660,53 +725,13 @@ const App: React.FC = () => {
 
 
   const renderHome = () => (
-    <div className="text-center max-w-4xl mx-auto py-12 px-4">
+    <div className="text-center max-w-4xl mx-auto py-12 px-4 flex-1 flex flex-col justify-center">
       <h1 className="text-4xl md:text-6xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-brand-light to-brand-primary tracking-tight">
         AI Script & Prompt Generator
       </h1>
-      <p className="text-lg md:text-xl text-neutral-text-secondary mb-6 max-w-2xl mx-auto leading-relaxed">Tự động tạo kịch bản, prompt ảnh, và prompt video từ chủ đề của bạn.</p>
+      <p className="text-lg md:text-xl text-neutral-text-secondary mb-12 max-w-2xl mx-auto leading-relaxed">Tự động tạo kịch bản, prompt ảnh, và prompt video từ chủ đề của bạn.</p>
       
-      <div className="flex flex-wrap justify-center items-center gap-3 mb-8">
-        {/* Icon / Theme Button */}
-        <button
-            className="h-11 w-11 flex items-center justify-center bg-[#2d3342] hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 shadow-sm transition-all"
-            title="Edit / Theme"
-        >
-            <EditIcon />
-        </button>
-
-        {/* Login Button */}
-        <button
-            className="flex items-center gap-3 h-11 px-5 bg-[#0F9D88] hover:bg-[#0d8a77] text-white font-medium rounded-lg shadow-sm transition-all"
-        >
-            <div className="bg-white p-0.5 rounded-full">
-                <GoogleIcon />
-            </div>
-            <span>Đăng nhập</span>
-        </button>
-
-        {/* Library Button */}
-        <button
-            className="flex items-center gap-2 h-11 px-5 bg-[#2d3342] hover:bg-gray-700 text-white font-medium rounded-lg border border-gray-700 shadow-sm transition-all relative"
-        >
-             <BookmarkIcon />
-             <span>Thư viện</span>
-             <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-white">
-                1
-             </span>
-        </button>
-
-        {/* API Button */}
-        <button
-            onClick={() => setIsApiModalOpen(true)}
-            className="h-11 px-6 bg-[#22C55E] hover:bg-[#1ea951] text-white font-bold rounded-lg shadow-sm transition-all flex items-center gap-2"
-        >
-            API 
-            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-normal">{apiKeys.length > 0 ? 'Active' : '!'}</span>
-        </button>
-      </div>
-
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+      <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100 w-full">
         <div className="mb-6">
             <label className="block text-left text-sm font-bold text-gray-700 mb-2 ml-1">Tên dự án / Chủ đề</label>
             <input
@@ -746,7 +771,7 @@ const App: React.FC = () => {
   );
 
   const renderInputForm = () => (
-    <div className="w-full max-w-6xl mx-auto px-4 py-8">
+    <div className="w-full max-w-6xl mx-auto px-4 py-8 animate-fade-in">
         <div className="flex items-center mb-8">
              <button onClick={() => setAppState(AppState.HOME)} className="p-2 rounded-full hover:bg-white hover:shadow-sm mr-4 transition-all text-gray-600"><BackIcon /></button>
             <h1 className="text-2xl md:text-3xl font-bold text-neutral-text">Chi tiết dự án: <span className="text-brand-primary">{topic.trim() || "Dự án từ kịch bản có sẵn"}</span></h1>
@@ -960,7 +985,14 @@ const App: React.FC = () => {
 
   return (
     <main className="min-h-screen w-full flex flex-col items-center bg-neutral-dark font-sans selection:bg-brand-primary selection:text-white relative">
-      {renderContent()}
+      <Header 
+        onGoHome={() => setAppState(AppState.HOME)} 
+        onOpenApi={() => setIsApiModalOpen(true)} 
+        apiKeyCount={apiKeys.length}
+      />
+      <div className="w-full flex-1 flex flex-col items-center">
+          {renderContent()}
+      </div>
       <ApiManagerModal 
         isOpen={isApiModalOpen}
         onClose={() => setIsApiModalOpen(false)}
