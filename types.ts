@@ -14,42 +14,69 @@ export enum FrameRatio {
   FOUR_FIVE = '4:5',
 }
 
-export enum CharacterType {
-  HUMAN = 'Con người',
-  ANIMAL = 'Động vật',
+export interface CharacterVisual {
+  bodyType: string;
+  mainShape: string;
+  lineStyle: string;
+  colorScheme: {
+    base: string;
+    accentColor: string;
+    background: string;
+  };
+  eyesType: string;
+  mouthType: string;
+  props: string[];
+  iconicSilhouette: string;
 }
 
-export interface HumanCharacter {
-  type: CharacterType.HUMAN;
+export interface CharacterPersonality {
+  coreTraits: string[];
+  strengths: string[];
+  flaws: string[];
+  motivation: string;
+  runningGag: string;
+}
+
+export interface CharacterBehavior {
+  defaultExpression: string;
+  expressionRange: string[];
+  signaturePoses: string[];
+  movementStyle: string;
+  timingNotes: string;
+}
+
+export interface CharacterVoice {
+  tone: string;
+  speechStyle: string;
+  catchphrases: string[];
+}
+
+export interface CharacterAiPrompt {
+  positive: string;
+  negative: string;
+}
+
+export interface CharacterProductionNotes {
+  usedInSeries: string[];
+  animationTips: string;
+  compatibility: string;
+}
+
+export interface Character {
   id: string;
+  name: string;
+  type: string; // Con người | Quái | Thần | Ma | Robot | Khác
+  role: string; // Anh hùng | Phản anh hùng | Phản diện | Comic relief | NPC
   gender: string;
-  age: string;
-  height: string;
-  skinColor: string;
-  hairStyle: string;
-  hairColor: string;
-  outfit: string;
-  face: string;
-  expression: string;
-  style: string;
+  ageRange: string;
+  
+  visual: CharacterVisual;
+  personality: CharacterPersonality;
+  behavior: CharacterBehavior;
+  voice: CharacterVoice;
+  aiPrompt: CharacterAiPrompt;
+  productionNotes: CharacterProductionNotes;
 }
-
-export interface AnimalCharacter {
-  type: CharacterType.ANIMAL;
-  id: string;
-  species: string;
-  furColor: string;
-  furLength: string;
-  accessories: string;
-  clothing: string;
-  eyes: string;
-  ears: string;
-  stance: string;
-  size: string;
-  personality: string;
-}
-
-export type Character = HumanCharacter | AnimalCharacter;
 
 export interface GeneratedPrompt {
   id: number;

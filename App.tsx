@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, ChangeEvent, useMemo, useEffect } from 'react';
-import { AppState, FrameRatio, CharacterType, HumanCharacter, AnimalCharacter, Character, GeneratedContent, GeneratedPrompt, ApiKeyConfig, GeminiModelConfig, GeminiModelId } from './types';
-import { FRAME_RATIO_OPTIONS, HUMAN_OPTIONS, ANIMAL_OPTIONS, PRESET_CHARACTERS, IMAGE_STYLES } from './constants';
+import { AppState, FrameRatio, Character, GeneratedContent, GeneratedPrompt, ApiKeyConfig, GeminiModelConfig, GeminiModelId, CharacterVisual, CharacterPersonality, CharacterBehavior, CharacterVoice, CharacterAiPrompt, CharacterProductionNotes } from './types';
+import { FRAME_RATIO_OPTIONS, CHARACTER_TYPES, CHARACTER_ROLES, BODY_TYPES, PRESET_CHARACTERS, IMAGE_STYLES } from './constants';
 import { Frame916Icon, Frame169Icon, Frame11Icon, Frame45Icon, PlusIcon, TrashIcon, BackIcon, CopyIcon, DownloadIcon, EditIcon, GoogleIcon, BookmarkIcon, CheckIcon, Logo, XMarkIcon, ExclamationCircleIcon, InformationCircleIcon } from './components/icons';
 import { generateScriptAndPrompts, calculateDurationFromScript, suggestCharacterFromScript, cleanScript, validateApiKey } from './services/geminiService';
 
@@ -56,15 +56,12 @@ interface QuickSelectProps<T> {
   label: string;
   options: string[];
   value: string;
-  name: keyof T;
-  onChange: (name: keyof T, value: string) => void;
+  name: string; // Changed to string to support paths
+  onChange: (value: string) => void;
   allowManualInput?: boolean;
 }
 
 const QuickSelect = <T,>({ label, options, value, name, onChange, allowManualInput = true }: QuickSelectProps<T>) => {
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    onChange(name, e.target.value);
-  };
   return (
     <div>
       <label className="block text-sm font-medium text-neutral-text-secondary mb-1">{label}</label>
@@ -73,7 +70,7 @@ const QuickSelect = <T,>({ label, options, value, name, onChange, allowManualInp
           <button
             key={option}
             type="button"
-            onClick={() => onChange(name, option)}
+            onClick={() => onChange(option)}
             className={`px-3 py-1 text-sm rounded-lg border transition-all ${
               value === option 
                 ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
@@ -87,11 +84,10 @@ const QuickSelect = <T,>({ label, options, value, name, onChange, allowManualInp
       {allowManualInput && (
         <input
           type="text"
-          name={String(name)}
           value={value}
-          onChange={handleInputChange}
+          onChange={(e) => onChange(e.target.value)}
           className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-neutral-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-shadow shadow-sm"
-          placeholder={`Hoặc nhập thủ công...`}
+          placeholder={`Nhập thủ công...`}
         />
       )}
     </div>
@@ -108,62 +104,229 @@ interface CharacterFormProps {
 }
 
 const CharacterForm: React.FC<CharacterFormProps> = ({ character, updateCharacter, removeCharacter, userScript, onSuggest, isSuggesting }) => {
-  const handleFieldChange = (name: keyof HumanCharacter | keyof AnimalCharacter, value: string) => {
-    updateCharacter(character.id, { [name]: value } as Partial<Character>);
-  };
+    const [activeTab, setActiveTab] = useState<'general' | 'visual' | 'personality' | 'behavior' | 'voice' | 'prompt'>('general');
+
+    // Helper to update nested properties safely
+    const updateNested = (path: string[], value: any) => {
+        const deepUpdate = (obj: any, keys: string[], val: any): any => {
+            if (keys.length === 0) return val;
+            const [current, ...rest] = keys;
+            const nextObj = obj && obj[current] ? obj[current] : {}; // Default to empty object if undefined
+            
+            // If it's an array update but we have string input (from textarea), handle split
+            // This logic is simple; validation might be needed for robust apps
+            return {
+                ...obj,
+                [current]: deepUpdate(nextObj, rest, val)
+            };
+        };
+        
+        const newChar = deepUpdate(character, path, value);
+        updateCharacter(character.id, newChar);
+    };
+
+    const handleArrayChange = (path: string[], value: string) => {
+        // Split by new line or comma for simple array input
+        const arr = value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+        updateNested(path, arr);
+    };
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 relative">
-        <button 
-            type="button" 
-            onClick={() => removeCharacter(character.id)}
-            className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"
-        >
-            <TrashIcon />
-        </button>
-      <div className="flex items-center gap-4">
-        <label className="text-lg font-bold text-neutral-text">Nhân vật</label>
-        <select 
-            value={character.type}
-            onChange={(e) => updateCharacter(character.id, { type: e.target.value as CharacterType })}
-            className="bg-gray-50 border border-gray-300 rounded-md px-3 py-1 text-neutral-text focus:outline-none focus:ring-1 focus:ring-brand-primary"
-        >
-            <option value={CharacterType.HUMAN}>Con người</option>
-            <option value={CharacterType.ANIMAL}>Động vật</option>
-        </select>
-      </div>
-
-      {character.type === CharacterType.HUMAN && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <QuickSelect label="Giới tính" options={HUMAN_OPTIONS.gender} value={character.gender} name="gender" onChange={handleFieldChange} />
-            <QuickSelect label="Độ tuổi" options={HUMAN_OPTIONS.age} value={character.age} name="age" onChange={handleFieldChange} />
-            <QuickSelect label="Chiều cao" options={HUMAN_OPTIONS.height} value={character.height} name="height" onChange={handleFieldChange} />
-            <QuickSelect label="Màu da" options={HUMAN_OPTIONS.skinColor} value={character.skinColor} name="skinColor" onChange={handleFieldChange} />
-            <QuickSelect label="Kiểu tóc" options={HUMAN_OPTIONS.hairStyle} value={character.hairStyle} name="hairStyle" onChange={handleFieldChange} />
-            <QuickSelect label="Màu tóc" options={HUMAN_OPTIONS.hairColor} value={character.hairColor} name="hairColor" onChange={handleFieldChange} />
-            <QuickSelect label="Trang phục" options={HUMAN_OPTIONS.outfit} value={character.outfit} name="outfit" onChange={handleFieldChange} />
-            <QuickSelect label="Khuôn mặt" options={HUMAN_OPTIONS.face} value={character.face} name="face" onChange={handleFieldChange} />
-            <QuickSelect label="Biểu cảm" options={HUMAN_OPTIONS.expression} value={character.expression} name="expression" onChange={handleFieldChange} />
-            <QuickSelect label="Phong cách" options={HUMAN_OPTIONS.style} value={character.style} name="style" onChange={handleFieldChange} />
+    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm relative transition-all">
+        <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-4 flex-1">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-brand-light to-brand-primary flex items-center justify-center text-white font-bold shadow-sm">
+                    {character.name.charAt(0).toUpperCase() || '?'}
+                </div>
+                <div className="flex-1">
+                    <input 
+                        type="text" 
+                        value={character.name}
+                        onChange={(e) => updateNested(['name'], e.target.value)}
+                        className="text-lg font-bold text-neutral-text bg-transparent border-b border-transparent hover:border-gray-300 focus:border-brand-primary focus:outline-none w-full"
+                        placeholder="Tên nhân vật..."
+                    />
+                    <div className="text-xs text-gray-500 flex gap-2 mt-1">
+                         <span>{character.type || 'Chưa chọn loại'}</span> • <span>{character.role || 'Chưa chọn vai trò'}</span>
+                    </div>
+                </div>
+            </div>
+            <button 
+                type="button" 
+                onClick={() => removeCharacter(character.id)}
+                className="text-gray-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-full"
+                title="Xóa nhân vật"
+            >
+                <TrashIcon />
+            </button>
         </div>
-      )}
 
-      {character.type === CharacterType.ANIMAL && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <QuickSelect label="Loài" options={ANIMAL_OPTIONS.species} value={character.species} name="species" onChange={handleFieldChange} />
-            <QuickSelect label="Màu lông" options={ANIMAL_OPTIONS.furColor} value={character.furColor} name="furColor" onChange={handleFieldChange} />
-            <QuickSelect label="Độ dài lông" options={ANIMAL_OPTIONS.furLength} value={character.furLength} name="furLength" onChange={handleFieldChange} />
-            <QuickSelect label="Phụ kiện" options={ANIMAL_OPTIONS.accessories} value={character.accessories} name="accessories" onChange={handleFieldChange} />
-            <QuickSelect label="Quần áo" options={ANIMAL_OPTIONS.clothing} value={character.clothing} name="clothing" onChange={handleFieldChange} />
-            <QuickSelect label="Mắt" options={ANIMAL_OPTIONS.eyes} value={character.eyes} name="eyes" onChange={handleFieldChange} />
-            <QuickSelect label="Tai" options={ANIMAL_OPTIONS.ears} value={character.ears} name="ears" onChange={handleFieldChange} />
-            <QuickSelect label="Dáng đứng" options={ANIMAL_OPTIONS.stance} value={character.stance} name="stance" onChange={handleFieldChange} />
-            <QuickSelect label="Kích thước" options={ANIMAL_OPTIONS.size} value={character.size} name="size" onChange={handleFieldChange} />
-            <QuickSelect label="Tính cách" options={ANIMAL_OPTIONS.personality} value={character.personality} name="personality" onChange={handleFieldChange} />
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-gray-100 mb-6 overflow-x-auto no-scrollbar">
+            {[
+                { id: 'general', label: 'Tổng quan' },
+                { id: 'visual', label: 'Ngoại hình' },
+                { id: 'personality', label: 'Tính cách' },
+                { id: 'behavior', label: 'Hành vi' },
+                { id: 'voice', label: 'Giọng & Lời' },
+                { id: 'prompt', label: 'AI Prompt' }
+            ].map(tab => (
+                <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                        activeTab === tab.id 
+                        ? 'border-brand-primary text-brand-primary' 
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    {tab.label}
+                </button>
+            ))}
         </div>
-      )}
+
+        <div className="space-y-4 min-h-[300px]">
+            {/* GENERAL TAB */}
+            {activeTab === 'general' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    <QuickSelect label="Loại" options={CHARACTER_TYPES} value={character.type} name="type" onChange={(v) => updateNested(['type'], v)} />
+                    <QuickSelect label="Vai trò" options={CHARACTER_ROLES} value={character.role} name="role" onChange={(v) => updateNested(['role'], v)} />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Giới tính</label>
+                        <input type="text" value={character.gender} onChange={(e) => updateNested(['gender'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Độ tuổi (Khoảng)</label>
+                        <input type="text" value={character.ageRange} onChange={(e) => updateNested(['ageRange'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" />
+                    </div>
+                    <div className="md:col-span-2 mt-2">
+                         <label className="block text-sm font-medium text-gray-600 mb-1">Ghi chú sản xuất</label>
+                         <textarea 
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={2} 
+                            value={character.productionNotes.animationTips} 
+                            onChange={(e) => updateNested(['productionNotes', 'animationTips'], e.target.value)} 
+                            placeholder="Lưu ý cho animation..." 
+                         />
+                    </div>
+                </div>
+            )}
+
+            {/* VISUAL TAB */}
+            {activeTab === 'visual' && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    <QuickSelect label="Dáng người (Body Type)" options={BODY_TYPES} value={character.visual.bodyType} name="visual.bodyType" onChange={(v) => updateNested(['visual', 'bodyType'], v)} />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Hình dáng chính</label>
+                        <input type="text" value={character.visual.mainShape} onChange={(e) => updateNested(['visual', 'mainShape'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="VD: Đầu tròn, thân thẳng..." />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Nét vẽ (Line Style)</label>
+                        <input type="text" value={character.visual.lineStyle} onChange={(e) => updateNested(['visual', 'lineStyle'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="VD: Nét đen, dày vừa..." />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Bóng dáng đặc trưng (Silhouette)</label>
+                        <input type="text" value={character.visual.iconicSilhouette} onChange={(e) => updateNested(['visual', 'iconicSilhouette'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Đạo cụ (Props) - Cách nhau dấu phẩy</label>
+                        <textarea 
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm" 
+                            rows={2}
+                            value={character.visual.props.join(', ')}
+                            onChange={(e) => handleArrayChange(['visual', 'props'], e.target.value)}
+                        />
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Màu sắc</p>
+                        <div className="grid grid-cols-3 gap-2">
+                             <input type="text" placeholder="Base" value={character.visual.colorScheme.base} onChange={(e) => updateNested(['visual', 'colorScheme', 'base'], e.target.value)} className="border p-1 text-xs rounded" />
+                             <input type="text" placeholder="Accent" value={character.visual.colorScheme.accentColor} onChange={(e) => updateNested(['visual', 'colorScheme', 'accentColor'], e.target.value)} className="border p-1 text-xs rounded" />
+                             <input type="text" placeholder="BG" value={character.visual.colorScheme.background} onChange={(e) => updateNested(['visual', 'colorScheme', 'background'], e.target.value)} className="border p-1 text-xs rounded" />
+                        </div>
+                    </div>
+                 </div>
+            )}
+
+            {/* PERSONALITY TAB */}
+            {activeTab === 'personality' && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Tính cách chính</label>
+                        <textarea className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={2} value={character.personality.coreTraits.join(', ')} onChange={(e) => handleArrayChange(['personality', 'coreTraits'], e.target.value)} />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Điểm mạnh</label>
+                        <textarea className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={2} value={character.personality.strengths.join(', ')} onChange={(e) => handleArrayChange(['personality', 'strengths'], e.target.value)} />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Điểm yếu</label>
+                        <textarea className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={2} value={character.personality.flaws.join(', ')} onChange={(e) => handleArrayChange(['personality', 'flaws'], e.target.value)} />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Running Gag (Hài hước lặp lại)</label>
+                        <textarea className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={2} value={character.personality.runningGag} onChange={(e) => updateNested(['personality', 'runningGag'], e.target.value)} />
+                    </div>
+                 </div>
+            )}
+
+             {/* BEHAVIOR TAB */}
+             {activeTab === 'behavior' && (
+                 <div className="grid grid-cols-1 gap-4 animate-fade-in">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Biểu cảm mặc định</label>
+                        <input type="text" value={character.behavior.defaultExpression} onChange={(e) => updateNested(['behavior', 'defaultExpression'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Các biểu cảm thường gặp</label>
+                        <textarea className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={2} value={character.behavior.expressionRange.join(', ')} onChange={(e) => handleArrayChange(['behavior', 'expressionRange'], e.target.value)} />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Dáng điệu đặc trưng (Signature Poses)</label>
+                        <textarea className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={2} value={character.behavior.signaturePoses.join(', ')} onChange={(e) => handleArrayChange(['behavior', 'signaturePoses'], e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Phong cách di chuyển</label>
+                        <input type="text" value={character.behavior.movementStyle} onChange={(e) => updateNested(['behavior', 'movementStyle'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" />
+                    </div>
+                 </div>
+            )}
+
+            {/* VOICE TAB */}
+             {activeTab === 'voice' && (
+                 <div className="grid grid-cols-1 gap-4 animate-fade-in">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Tone giọng</label>
+                        <input type="text" value={character.voice.tone} onChange={(e) => updateNested(['voice', 'tone'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Cách nói chuyện</label>
+                        <input type="text" value={character.voice.speechStyle} onChange={(e) => updateNested(['voice', 'speechStyle'], e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm" />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Câu cửa miệng (Catchphrases)</label>
+                        <textarea className="w-full border border-gray-300 rounded-lg p-2 text-sm" rows={3} value={character.voice.catchphrases.join('\n')} onChange={(e) => handleArrayChange(['voice', 'catchphrases'], e.target.value)} placeholder="Mỗi câu một dòng" />
+                    </div>
+                 </div>
+            )}
+
+             {/* PROMPT TAB */}
+             {activeTab === 'prompt' && (
+                 <div className="grid grid-cols-1 gap-4 animate-fade-in">
+                    <div>
+                        <label className="block text-sm font-bold text-green-600 mb-1">Positive Prompt (Quan trọng cho AI)</label>
+                        <textarea className="w-full border border-green-200 bg-green-50 rounded-lg p-3 text-sm font-mono" rows={4} value={character.aiPrompt.positive} onChange={(e) => updateNested(['aiPrompt', 'positive'], e.target.value)} />
+                        <p className="text-xs text-gray-500 mt-1">Mô tả ngắn gọn bằng tiếng Anh để AI tạo ảnh chính xác.</p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-red-500 mb-1">Negative Prompt</label>
+                        <textarea className="w-full border border-red-200 bg-red-50 rounded-lg p-3 text-sm font-mono" rows={2} value={character.aiPrompt.negative} onChange={(e) => updateNested(['aiPrompt', 'negative'], e.target.value)} />
+                    </div>
+                 </div>
+            )}
+        </div>
+
       {userScript && (
-          <div className="border-t border-gray-100 pt-4 flex justify-end">
+          <div className="border-t border-gray-100 pt-4 flex justify-end mt-4">
               <button
                   type="button"
                   onClick={() => onSuggest(character.id)}
@@ -176,9 +339,9 @@ const CharacterForm: React.FC<CharacterFormProps> = ({ character, updateCharacte
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Đang phân tích...
+                        AI Phân tích
                     </>
-                  ) : 'AI gợi ý'}
+                  ) : 'AI Gợi ý chi tiết'}
               </button>
           </div>
       )}
@@ -634,28 +797,68 @@ const App: React.FC = () => {
       setAppState(AppState.INPUT_FORM);
   }
 
-  const addNewCharacter = useCallback((preset: Partial<HumanCharacter | AnimalCharacter> | null = null) => {
+  const addNewCharacter = useCallback((preset: Partial<Character> | null = null) => {
     const newId = `char_${Date.now()}`;
+    
+    // Default empty structure based on the new complex schema
+    const defaultCharacter: Character = {
+        id: newId,
+        name: "Nhân vật mới",
+        type: "Con người",
+        role: "Anh hùng",
+        gender: "Nam",
+        ageRange: "18-25",
+        visual: {
+            bodyType: "Stick cơ bản",
+            mainShape: "Đầu tròn",
+            lineStyle: "Đơn giản",
+            colorScheme: { base: "Đen trắng", accentColor: "Đỏ", background: "Trắng" },
+            eyesType: "Chấm tròn",
+            mouthType: "Nét đơn",
+            props: [],
+            iconicSilhouette: ""
+        },
+        personality: {
+            coreTraits: [],
+            strengths: [],
+            flaws: [],
+            motivation: "",
+            runningGag: ""
+        },
+        behavior: {
+            defaultExpression: "Bình thường",
+            expressionRange: [],
+            signaturePoses: [],
+            movementStyle: "",
+            timingNotes: ""
+        },
+        voice: {
+            tone: "Bình thường",
+            speechStyle: "Rõ ràng",
+            catchphrases: []
+        },
+        aiPrompt: {
+            positive: "simple stick figure, minimal style, white background",
+            negative: "realistic, 3d, complex"
+        },
+        productionNotes: {
+            usedInSeries: [],
+            animationTips: "",
+            compatibility: ""
+        }
+    };
+
     const newCharacter = preset 
-      ? { ...preset, id: newId }
-      : {
-          type: CharacterType.HUMAN,
-          id: newId,
-          gender: 'Nam', age: '18–25', height: '170cm', skinColor: 'Sáng', hairStyle: 'Ngắn', hairColor: 'Đen', outfit: 'Casual', face: 'Tự nhiên', expression: 'Tự nhiên', style: 'Hiện đại'
-        };
-    setCharacters(prev => [...prev, newCharacter as Character]);
+      ? { ...defaultCharacter, ...preset, id: newId } // Merge preset over default
+      : defaultCharacter;
+
+    setCharacters(prev => [...prev, newCharacter]);
     if (!preset) addToast("Đã thêm nhân vật mới", "info");
   }, [addToast]);
 
   const updateCharacter = useCallback((id: string, newDetails: Partial<Character>) => {
     setCharacters(prev => prev.map(char => {
         if (char.id === id) {
-            if (newDetails.type && newDetails.type !== char.type) {
-                const newId = char.id;
-                return newDetails.type === CharacterType.HUMAN ?
-                    { type: CharacterType.HUMAN, id: newId, gender: 'Nam', age: '18–25', height: '170cm', skinColor: 'Sáng', hairStyle: 'Ngắn', hairColor: 'Đen', outfit: 'Casual', face: 'Tự nhiên', expression: 'Tự nhiên', style: 'Hiện đại' } :
-                    { type: CharacterType.ANIMAL, id: newId, species: 'Mèo', furColor: 'Trắng', furLength: 'Ngắn', accessories: 'Nơ cổ', clothing: 'Không', eyes: 'Xanh', ears: 'Ngắn', stance: 'Bốn chân', size: 'Bé', personality: 'Lanh lợi' };
-            }
             return { ...char, ...newDetails };
         }
         return char;
@@ -744,6 +947,10 @@ const App: React.FC = () => {
     setIsSuggestingCharacterId(characterId);
     try {
         const suggestion = await suggestCharacterFromScript(activeKey, userScript, characterToUpdate, activeModelId);
+        // suggestion might be Partial<Character>, we merge deeply in logic or just spread here
+        // Since suggestion returns the full nested structure (if Gemini obeys), spread is mostly fine for top level, 
+        // but for deep nested objects, simple spread might overwrite if partial.
+        // However, geminiService is asked to return ALL fields.
         updateCharacter(characterId, suggestion);
         addToast("Đã cập nhật nhân vật từ kịch bản!", "success");
     } catch (err) {
@@ -759,7 +966,7 @@ const App: React.FC = () => {
     let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
     csvContent += "STT;Loại;Tiêu đề;Nội dung;Thời lượng (s);Nhân vật;Khung hình;Ghi chú\n";
 
-    const characterNames = (generatedContent.characters as Character[]).map((c, i) => `NV${i + 1}`).join(', ');
+    const characterNames = (generatedContent.characters as Character[]).map((c, i) => `NV${i + 1}: ${c.name}`).join(', ');
 
     const allPrompts = [...generatedContent.imagePrompts, ...generatedContent.videoPrompts]
         .sort((a, b) => a.id - b.id);
@@ -772,7 +979,7 @@ const App: React.FC = () => {
             `"${prompt.title.replace(/"/g, '""')}"`,
             `"${prompt.text.replace(/"/g, '""')}"`, 
             prompt.duration,
-            characterNames,
+            `"${characterNames}"`,
             prompt.frame_ratio,
             `"${prompt.description.replace(/"/g, '""')}"`
         ].join(";"); 
@@ -941,9 +1148,7 @@ const App: React.FC = () => {
                  
                  <div className="flex flex-wrap gap-3 mb-6">
                     <span className="text-sm font-medium text-gray-500 py-1">Gợi ý mẫu:</span>
-                    <button type="button" onClick={() => addNewCharacter(PRESET_CHARACTERS.human_male)} className="px-3 py-1 text-sm rounded-full bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium transition-colors">Nam trẻ trung</button>
-                    <button type="button" onClick={() => addNewCharacter(PRESET_CHARACTERS.human_female)} className="px-3 py-1 text-sm rounded-full bg-pink-100 hover:bg-pink-200 text-pink-700 font-medium transition-colors">Nữ thanh lịch</button>
-                    <button type="button" onClick={() => addNewCharacter(PRESET_CHARACTERS.animal_cat)} className="px-3 py-1 text-sm rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700 font-medium transition-colors">Mèo trắng 😺</button>
+                    <button type="button" onClick={() => addNewCharacter(PRESET_CHARACTERS.stick_hero)} className="px-3 py-1 text-sm rounded-full bg-sky-100 hover:bg-sky-200 text-sky-700 font-medium transition-colors">Anh hùng xui xẻo</button>
                  </div>
 
                  <div className="space-y-6">
@@ -965,7 +1170,7 @@ const App: React.FC = () => {
                     onClick={() => addNewCharacter()}
                     className="mt-6 w-full md:w-auto py-3 px-6 flex items-center justify-center gap-2 text-brand-primary bg-indigo-50 hover:bg-indigo-100 rounded-xl font-bold transition-colors border border-indigo-100"
                  >
-                    <PlusIcon/> Thêm nhân vật
+                    <PlusIcon/> Thêm nhân vật mới
                  </button>
             </div>
 
