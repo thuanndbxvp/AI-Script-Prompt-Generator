@@ -132,32 +132,19 @@ const CharacterForm: React.FC<CharacterFormProps> = ({ character, updateCharacte
     };
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm relative transition-all">
-        <div className="flex justify-between items-start mb-4">
-            <div className="flex items-center gap-4 flex-1">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-brand-light to-brand-primary flex items-center justify-center text-white font-bold shadow-sm">
-                    {character.name.charAt(0).toUpperCase() || '?'}
-                </div>
-                <div className="flex-1">
-                    <input 
-                        type="text" 
-                        value={character.name}
-                        onChange={(e) => updateNested(['name'], e.target.value)}
-                        className="text-lg font-bold text-neutral-text bg-transparent border-b border-transparent hover:border-gray-300 focus:border-brand-primary focus:outline-none w-full"
-                        placeholder="Tên nhân vật..."
-                    />
-                    <div className="text-xs text-gray-500 flex gap-2 mt-1">
-                         <span>{character.type || 'Chưa chọn loại'}</span> • <span>{character.role || 'Chưa chọn vai trò'}</span>
-                    </div>
-                </div>
-            </div>
+    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm relative transition-all animate-fade-in">
+        <div className="flex justify-between items-start mb-4 border-b border-gray-100 pb-4">
+             <div>
+                <h3 className="text-lg font-bold text-brand-primary">Chỉnh sửa: {character.name}</h3>
+                <p className="text-sm text-gray-500">Cập nhật thông tin chi tiết cho nhân vật này.</p>
+             </div>
+             
             <button 
                 type="button" 
                 onClick={() => removeCharacter(character.id)}
-                className="text-gray-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-full"
-                title="Xóa nhân vật"
+                className="text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1 text-sm font-medium px-3 py-1.5 hover:bg-red-50 rounded-lg"
             >
-                <TrashIcon />
+                <TrashIcon /> Xóa nhân vật
             </button>
         </div>
 
@@ -189,6 +176,16 @@ const CharacterForm: React.FC<CharacterFormProps> = ({ character, updateCharacte
             {/* GENERAL TAB */}
             {activeTab === 'general' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Tên nhân vật</label>
+                         <input 
+                            type="text" 
+                            value={character.name}
+                            onChange={(e) => updateNested(['name'], e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm font-bold text-gray-800 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none"
+                            placeholder="Tên nhân vật..."
+                        />
+                    </div>
                     <QuickSelect label="Loại" options={CHARACTER_TYPES} value={character.type} name="type" onChange={(v) => updateNested(['type'], v)} />
                     <QuickSelect label="Vai trò" options={CHARACTER_ROLES} value={character.role} name="role" onChange={(v) => updateNested(['role'], v)} />
                     <div>
@@ -891,6 +888,7 @@ const App: React.FC = () => {
   const [isConsistent, setIsConsistent] = useState(true);
   const [frameRatio, setFrameRatio] = useState<FrameRatio>(FrameRatio.SIXTEEN_NINE);
   const [imageStyle, setImageStyle] = useState<string>(IMAGE_STYLES[0].prompt);
+  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
   
   // Results & UI State
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
@@ -999,10 +997,6 @@ const App: React.FC = () => {
 
   const totalSeconds = useMemo(() => (minutes * 60) + seconds, [minutes, seconds]);
 
-  // Removed groupedImageStyles here because it is now in DirectorModal, 
-  // but if needed elsewhere it could be kept. 
-  // Leaving it out for now as it was only used in renderInputForm which is changing.
-
   const handleStart = () => {
     if (topic.trim() === '' && userScript.trim() === '') {
       addToast("Vui lòng nhập chủ đề hoặc dán kịch bản của bạn.", "error");
@@ -1085,6 +1079,7 @@ const App: React.FC = () => {
     }
 
     setCharacters(prev => [...prev, newCharacter]);
+    setActiveCharacterId(newCharacter.id);
     if (!preset) addToast("Đã thêm nhân vật mới", "info");
     else addToast(`Đã thêm: ${newCharacter.name}`, "success");
   }, [addToast, characters]);
@@ -1100,8 +1095,11 @@ const App: React.FC = () => {
 
   const removeCharacter = useCallback((id: string) => {
     setCharacters(prev => prev.filter(char => char.id !== id));
+    if (activeCharacterId === id) {
+        setActiveCharacterId(null);
+    }
     addToast("Đã xóa nhân vật", "info");
-  }, [addToast]);
+  }, [addToast, activeCharacterId]);
   
   const handleGenerate = async () => {
     const activeKey = getActiveKey();
@@ -1227,7 +1225,7 @@ const App: React.FC = () => {
 
 
   const renderHome = () => (
-    <div className="text-center max-w-4xl mx-auto py-12 px-4 flex-1 flex flex-col justify-center">
+    <div className="text-center max-w-4xl mx-auto py-4 md:py-8 px-4 flex-1 flex flex-col justify-center">
       <h1 className="text-4xl md:text-6xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-brand-light to-brand-primary tracking-tight">
         AI Script & Prompt Generator
       </h1>
@@ -1272,7 +1270,10 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderInputForm = () => (
+  const renderInputForm = () => {
+      const activeChar = characters.find(c => c.id === activeCharacterId);
+
+      return (
     <div className="w-full max-w-6xl mx-auto px-4 py-8 animate-fade-in">
         <div className="flex items-center mb-8">
              <button onClick={() => setAppState(AppState.HOME)} className="p-2 rounded-full hover:bg-white hover:shadow-sm mr-4 transition-all text-gray-600"><BackIcon /></button>
@@ -1280,9 +1281,10 @@ const App: React.FC = () => {
         </div>
         
         <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="space-y-8">
-            <div className="grid grid-cols-1 gap-6">
-                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
-                    <div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* LEFT COLUMN */}
+                <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                         <h2 className="text-lg font-bold mb-4 text-neutral-text flex items-center gap-2">
                             <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">1</span> 
                             Thời lượng video
@@ -1323,7 +1325,8 @@ const App: React.FC = () => {
                         </div>
                         <p className="text-sm text-gray-500 mt-2 ml-1">Tổng thời lượng: <span className="font-bold text-brand-primary">{totalSeconds}</span> giây</p>
                     </div>
-                    <div className="pt-4 border-t border-gray-100">
+                    
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                         <h2 className="text-lg font-bold mb-4 text-neutral-text flex items-center gap-2">
                              <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">2</span>
                              Tùy chọn nhân vật
@@ -1340,53 +1343,88 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Characters Section */}
-            <div>
-                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-bold text-neutral-text flex items-center gap-2">
-                        <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">3</span>
-                        Chi tiết nhân vật
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={() => setIsUniverseModalOpen(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-brand-light to-brand-primary text-white text-sm font-bold rounded-full shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2"
-                    >
-                        <BookmarkIcon /> Chọn từ Vũ trụ Nhân vật
-                    </button>
-                 </div>
-                 
-                 {characters.length === 0 && (
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-center mb-6">
-                        <p className="text-blue-800 font-medium mb-2">Chưa có nhân vật nào được chọn.</p>
-                        <p className="text-blue-600 text-sm">Nếu bạn để trống, AI sẽ tự động chọn nhân vật phù hợp từ Vũ trụ nhân vật cho kịch bản của bạn.</p>
+                {/* RIGHT COLUMN - Character List Manager */}
+                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full">
+                    <div className="mb-4">
+                        <h2 className="text-lg font-bold text-neutral-text flex items-center gap-2 mb-4">
+                            <span className="bg-brand-primary text-white text-xs px-2 py-1 rounded">3</span>
+                            Chi tiết nhân vật
+                        </h2>
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                             <button
+                                type="button"
+                                onClick={() => setIsUniverseModalOpen(true)}
+                                className="px-3 py-2.5 bg-gradient-to-r from-brand-light to-brand-primary text-white text-sm font-bold rounded-lg shadow hover:shadow-md transition-all flex items-center justify-center gap-2"
+                            >
+                                <BookmarkIcon /> Chọn từ Vũ trụ
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => addNewCharacter()}
+                                className="px-3 py-2.5 text-brand-primary bg-indigo-50 hover:bg-indigo-100 rounded-lg font-bold transition-colors border border-indigo-100 flex items-center justify-center gap-2 text-sm"
+                             >
+                                <PlusIcon/> Thêm thủ công
+                             </button>
+                        </div>
+                        
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                            {characters.length === 0 ? (
+                                <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                    <p className="text-gray-400 text-sm">Chưa có nhân vật nào.</p>
+                                    <p className="text-gray-400 text-xs mt-1">Thêm từ vũ trụ hoặc tạo mới.</p>
+                                </div>
+                            ) : (
+                                characters.map(char => (
+                                    <div 
+                                        key={char.id}
+                                        onClick={() => setActiveCharacterId(char.id)}
+                                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${
+                                            activeCharacterId === char.id 
+                                            ? 'border-brand-primary bg-indigo-50 ring-1 ring-brand-primary' 
+                                            : 'border-gray-200 bg-white hover:border-brand-light'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-8 w-8 rounded-full bg-brand-light/20 text-brand-primary flex items-center justify-center font-bold text-xs">
+                                                {char.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-gray-800">{char.name}</h4>
+                                                <p className="text-[10px] text-gray-500">{char.role} • {char.type}</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); removeCharacter(char.id); }}
+                                            className="text-gray-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                                        >
+                                            <TrashIcon />
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
-                 )}
-
-                 <div className="space-y-6">
-                    {characters.map(char => (
-                        <CharacterForm 
-                            key={char.id} 
-                            character={char} 
-                            updateCharacter={updateCharacter} 
-                            removeCharacter={removeCharacter}
-                            userScript={userScript}
-                            onSuggest={handleSuggestCharacter}
-                            isSuggesting={isSuggestingCharacterId === char.id}
-                        />
-                    ))}
-                 </div>
-
-                 <button
-                    type="button"
-                    onClick={() => addNewCharacter()}
-                    className="mt-6 w-full md:w-auto py-3 px-6 flex items-center justify-center gap-2 text-brand-primary bg-indigo-50 hover:bg-indigo-100 rounded-xl font-bold transition-colors border border-indigo-100"
-                 >
-                    <PlusIcon/> Thêm nhân vật thủ công (Custom)
-                 </button>
+                    {characters.length > 0 && !activeCharacterId && (
+                         <p className="text-xs text-center text-gray-400 italic mt-auto">Chọn một nhân vật để chỉnh sửa chi tiết ở dưới.</p>
+                    )}
+                </div>
             </div>
+
+            {/* BOTTOM SECTION - Detail Form */}
+            {activeChar && (
+                <div className="border-t-2 border-gray-100 pt-8">
+                     <CharacterForm 
+                        key={activeChar.id} 
+                        character={activeChar} 
+                        updateCharacter={updateCharacter} 
+                        removeCharacter={removeCharacter}
+                        userScript={userScript}
+                        onSuggest={handleSuggestCharacter}
+                        isSuggesting={isSuggestingCharacterId === activeChar.id}
+                    />
+                </div>
+            )}
             
             <div className="sticky bottom-0 py-6 bg-neutral-dark/90 backdrop-blur-sm flex justify-center z-10 border-t border-gray-200">
                  <button
@@ -1399,6 +1437,7 @@ const App: React.FC = () => {
         </form>
     </div>
   );
+  }
 
     const renderGenerating = () => (
         <div className="text-center flex flex-col items-center justify-center h-[60vh]">
